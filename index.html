@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple To-Do List</title>
+    <title>Simple To-Do List with Checkboxes</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -70,7 +70,7 @@
             padding: 12px;
             border-bottom: 1px solid #eee;
             display: flex;
-            justify-content: space-between;
+            /* justify-content: space-between; */ /* Adjusted for checkbox */
             align-items: center;
             transition: background-color 0.3s ease;
         }
@@ -79,14 +79,22 @@
             border-bottom: none;
         }
 
-        #taskList li.completed span {
+        #taskList li.completed .task-item-text { /* MODIFIED: Target text span */
             text-decoration: line-through;
             color: #aaa;
         }
 
-        #taskList li span {
-            cursor: pointer;
+        .task-item-text { /* MODIFIED: Class for the text part */
+            /* cursor: pointer; */ /* MODIFIED: No longer using text click to complete */
             flex-grow: 1;
+            word-break: break-all;
+        }
+
+        .complete-checkbox { /* NEW: Styling for the checkbox */
+            margin-right: 12px;
+            cursor: pointer;
+            /* Optional: to make checkbox larger */
+            /* transform: scale(1.2); */
         }
 
         .delete-btn {
@@ -97,7 +105,7 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
-            margin-left: 10px;
+            margin-left: 10px; /* Ensures space from task text */
         }
 
         .delete-btn:hover {
@@ -120,10 +128,6 @@
             font-size: 14px;
         }
 
-        .task-item {
-            /* For easier selection of the task text itself */
-            word-break: break-all; /* Prevents long words from breaking layout */
-        }
         .empty-state {
             text-align: center;
             color: #777;
@@ -166,7 +170,6 @@
 
             let tasks = []; // Array to store task objects {id: number, text: string, completed: boolean}
 
-            // Load tasks from localStorage if available
             loadTasks();
             renderTasks();
 
@@ -180,17 +183,41 @@
 
             function updateEmptyState() {
                 const visibleTasks = taskList.querySelectorAll('li:not([style*="display: none"])').length;
-                if (tasks.length === 0 || visibleTasks === 0 && taskFilter.value !== 'all') {
-                     if (tasks.length === 0) {
-                        emptyStateMsg.textContent = "No tasks yet. Add one above!";
-                     } else if (taskFilter.value === 'active') {
-                        emptyStateMsg.textContent = "No active tasks.";
-                     } else if (taskFilter.value === 'completed') {
-                        emptyStateMsg.textContent = "No completed tasks.";
-                     }
-                     emptyStateMsg.style.display = 'block';
+                let message = "";
+                let showMessage = false;
+
+                if (tasks.length === 0) {
+                    message = "No tasks yet. Add one above!";
+                    showMessage = true;
                 } else {
-                     emptyStateMsg.style.display = 'none';
+                    const filterValue = taskFilter.value;
+                    const hasVisibleFilteredTasks = tasks.some(task => {
+                        if (filterValue === 'active') return !task.completed;
+                        if (filterValue === 'completed') return task.completed;
+                        return true; // 'all'
+                    });
+
+                    if (!hasVisibleFilteredTasks) {
+                        if (filterValue === 'active') {
+                            message = "No active tasks.";
+                        } else if (filterValue === 'completed') {
+                            message = "No completed tasks.";
+                        }
+                        // For 'all', if tasks.length > 0 but filteredTasks is 0,
+                        // it means all tasks are hidden by some other means (not applicable here)
+                        // or it's an impossible state if filter is 'all'.
+                        // So we only set message for active/completed filters when they result in empty.
+                        if (filterValue !== 'all') {
+                             showMessage = true;
+                        }
+                    }
+                }
+
+                if (showMessage) {
+                    emptyStateMsg.textContent = message;
+                    emptyStateMsg.style.display = 'block';
+                } else {
+                    emptyStateMsg.style.display = 'none';
                 }
             }
 
@@ -216,13 +243,8 @@
 
             function renderTasks() {
                 taskList.innerHTML = ''; // Clear existing tasks
-                if (tasks.length === 0) {
-                    updateEmptyState();
-                    return;
-                }
 
                 const filterValue = taskFilter.value;
-
                 const filteredTasks = tasks.filter(task => {
                     if (filterValue === 'active') return !task.completed;
                     if (filterValue === 'completed') return task.completed;
@@ -230,7 +252,7 @@
                 });
 
                 if (filteredTasks.length === 0) {
-                     updateEmptyState();
+                     updateEmptyState(); // Call updateEmptyState even if filteredTasks is empty
                      return;
                 }
 
@@ -242,17 +264,27 @@
                         listItem.classList.add('completed');
                     }
 
+                    // --- MODIFICATION START: Add Checkbox ---
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.classList.add('complete-checkbox');
+                    checkbox.checked = task.completed;
+                    checkbox.addEventListener('change', () => toggleComplete(task.id));
+                    listItem.appendChild(checkbox);
+                    // --- MODIFICATION END ---
+
                     const taskSpan = document.createElement('span');
                     taskSpan.textContent = task.text;
-                    taskSpan.classList.add('task-item'); // For easier selection
-                    taskSpan.addEventListener('click', () => toggleComplete(task.id));
+                    taskSpan.classList.add('task-item-text'); // MODIFIED: New class for text
+                    // MODIFIED: Removed click listener from span for toggling complete
+                    // taskSpan.addEventListener('click', () => toggleComplete(task.id));
 
                     const deleteBtn = document.createElement('button');
                     deleteBtn.textContent = 'Delete';
                     deleteBtn.classList.add('delete-btn');
                     deleteBtn.addEventListener('click', () => deleteTask(task.id));
 
-                    listItem.appendChild(taskSpan);
+                    listItem.appendChild(taskSpan); // Text comes after checkbox
                     listItem.appendChild(deleteBtn);
                     taskList.appendChild(listItem);
                 });
@@ -264,7 +296,7 @@
                     task.id === id ? { ...task, completed: !task.completed } : task
                 );
                 saveTasks();
-                renderTasks();
+                renderTasks(); // Re-render to reflect changes
             }
 
             function deleteTask(id) {
@@ -283,6 +315,9 @@
                     tasks = JSON.parse(storedTasks);
                 }
             }
+
+            // Initial call to set up empty state correctly on page load
+            updateEmptyState();
         });
     </script>
 </body>
